@@ -17,9 +17,9 @@ class _MainLayoutState extends State<MainLayout> {
 
 final List<Widget> _screens = [
     const HomeScreen(), // Artık gerçek ekranımızı gösteriyor
-    const Center(child: Text('Streak Tracker (Yakında)')),
-    const Center(child: Text('Prayer Tracker (Yakında)')),
-    const Center(child: Text('Meditation (Yakında)')),
+    const StreakScreen(),
+    const PrayerScreen(),
+    const MedScreen(),
   ];
 
   @override
