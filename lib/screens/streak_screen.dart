@@ -99,12 +99,17 @@ class _StreakScreenState extends State<StreakScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    // Süreyi parçalara ayırma
     int days = _currentStreak.inDays;
     int hours = _currentStreak.inHours % 24;
     int minutes = _currentStreak.inMinutes % 60;
     int seconds = _currentStreak.inSeconds % 60;
+
+    // Temaya Göre Dinamik Renkler:
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    Color textColor = isDark ? Colors.white : Colors.black;
+    Color boxColor = isDark ? Colors.grey[900]! : Colors.grey[100]!;
 
     return SafeArea(
       child: Center(
@@ -116,7 +121,6 @@ class _StreakScreenState extends State<StreakScreen> {
               const Text('CURRENT STREAK', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 2.0, color: Colors.grey)),
               const SizedBox(height: 30),
               
-              // Canlı Sayaç Görünümü
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -135,15 +139,15 @@ class _StreakScreenState extends State<StreakScreen> {
                 onPressed: _resetStreak,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                  side: const BorderSide(color: Colors.black, width: 2),
+                  side: BorderSide(color: textColor, width: 2), // Renk dinamikleşti
                 ),
-                child: const Text('RESET STREAK', style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text('RESET STREAK', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)), // Renk dinamikleşti
               ),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontStyle: FontStyle.italic)),
+                decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(12)), // Renk dinamikleşti
+                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: textColor)), // Renk dinamikleşti
               ),
               const SizedBox(height: 20),
             ],
@@ -152,7 +156,7 @@ class _StreakScreenState extends State<StreakScreen> {
       ),
     );
   }
-
+  
   // Zaman kutucukları için yardımcı widget
   Widget _timeBox(String value, String label) {
     return Column(

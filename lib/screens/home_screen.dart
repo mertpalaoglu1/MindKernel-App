@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,55 +11,78 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // To-Do listesi için değişkenler
   List<String> _todos = [];
   List<bool> _todoStates = [];
   final TextEditingController _todoController = TextEditingController();
 
-  // Alışkanlıklar için değişkenler
-  final Map<String, bool> _habits = {
-    'Gym': false,
-    'Meditation': false,
-    'Reading': false,
-    'Journal': false,
-  };
+  // Eylem isimleri butonlarda kalacak
+  final List<String> _habits = ['Gym', 'Meditation', 'Reading', 'Journal'];
+  
+  Map<String, bool> _dailyStatus = {};
+  Map<String, int> _totalXP = {};
+  String _lastSavedDate = "";
 
   @override
   void initState() {
     super.initState();
-    _loadData(); // Uygulama açıldığında verileri yükle
+    for (var h in _habits) {
+      _dailyStatus[h] = false;
+      _totalXP[h] = 0;
+    }
+    _loadData();
   }
 
-  // SharedPreferences'tan verileri okuma
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    DateTime logicalNow = DateTime.now().subtract(const Duration(hours: 4));
+    final String today = logicalNow.toIso8601String().substring(0, 10);
+
     setState(() {
       _todos = prefs.getStringList('todos') ?? [];
-      _todoStates = (prefs.getStringList('todoStates') ?? [])
-          .map((e) => e == 'true')
-          .toList();
+      _todoStates = (prefs.getStringList('todoStates') ?? []).map((e) => e == 'true').toList();
+      _lastSavedDate = prefs.getString('lastHabitDate') ?? today;
+      
+      bool isNewDay = _lastSavedDate != today;
 
-      for (var key in _habits.keys) {
-        _habits[key] = prefs.getBool('habit_$key') ?? false;
+      for (var h in _habits) {
+        _totalXP[h] = prefs.getInt('xp_$h') ?? 0;
+        if (isNewDay) {
+          _dailyStatus[h] = false;
+        } else {
+          _dailyStatus[h] = prefs.getBool('daily_$h') ?? false;
+        }
+      }
+
+      if (isNewDay) {
+        prefs.setString('lastHabitDate', today);
       }
     });
   }
 
-  // To-Do verilerini kaydetme
   Future<void> _saveTodos() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('todos', _todos);
-    await prefs.setStringList(
-        'todoStates', _todoStates.map((e) => e.toString()).toList());
+    await prefs.setStringList('todoStates', _todoStates.map((e) => e.toString()).toList());
   }
 
-  // Alışkanlık verisini kaydetme
-  Future<void> _saveHabit(String key, bool value) async {
+  Future<void> _toggleHabit(String id) async {
+    HapticFeedback.lightImpact();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('habit_$key', value);
+    bool newStatus = !_dailyStatus[id]!;
+    
+    setState(() {
+      _dailyStatus[id] = newStatus;
+      if (newStatus) {
+        _totalXP[id] = _totalXP[id]! + 1;
+      } else {
+        _totalXP[id] = _totalXP[id]! - 1;
+      }
+    });
+
+    await prefs.setBool('daily_$id', newStatus);
+    await prefs.setInt('xp_$id', _totalXP[id]!);
   }
 
-  // Yeni görev ekleme (Maksimum 5)
   void _addTodo() {
     if (_todoController.text.isNotEmpty && _todos.length < 5) {
       setState(() {
@@ -69,8 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Görev silme
   void _deleteTodo(int index) {
+    HapticFeedback.lightImpact();
     setState(() {
       _todos.removeAt(index);
       _todoStates.removeAt(index);
@@ -78,71 +103,139 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveTodos();
   }
 
+  // XP'ye göre Unvan Belirleme
+  String get _currentTitle {
+    String bestHabit = _habits[0];
+    int maxXP = 0;
+    
+    for (var h in _habits) {
+      if (_totalXP[h]! > maxXP) {
+        maxXP = _totalXP[h]!;
+        bestHabit = h;
+      }
+    }
+    
+    if (maxXP == 0) return "The Initiate";
+    
+    switch (bestHabit) {
+      case 'Gym': return "The Juggernaut";
+      case 'Meditation': return "The Zen Master";
+      case 'Reading': return "The Sage";
+      case 'Journal': return "The Observer";
+      default: return "The Initiate";
+    }
+  }
+
+  // Kazanma Durumu (Sadece 4 alışkanlık true ise)
+  bool get _isDayWon {
+    return _dailyStatus.values.every((state) => state == true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- TO-DO BÖLÜMÜ ---
-            const Text(
-              'DAILY FOCUS',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            
-            // Görev Ekleme Alanı
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _todoController,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a task...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                    ),
-                    onSubmitted: (_) => _addTodo(),
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    Color textColor = isDark ? Colors.white : Colors.black;
+    Color boxColor = isDark ? Colors.grey[900]! : Colors.white;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_currentTitle, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+        actions: [
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              AppTheme.themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+            },
+          )
+        ],
+      ),
+      // TAŞMA HATASINI ÇÖZEN SCROLL YAPISI:
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_isDayWon) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white : Colors.black,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        "YOU WON TODAY.",
+                        style: TextStyle(color: isDark ? Colors.black : Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 3),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        "Now put the phone down.",
+                        style: TextStyle(color: isDark ? Colors.grey[800] : Colors.grey[300], fontSize: 14),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _todos.length < 5 ? _addTodo : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Icon(Icons.add),
-                )
               ],
-            ),
-            const SizedBox(height: 10),
-            
-            // Görev Listesi
-            Expanded(
-              child: ListView.builder(
+
+              const Text('DAILY FOCUS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 10),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _todoController,
+                      decoration: InputDecoration(
+                        hintText: 'Add a task...',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                        hintStyle: TextStyle(color: isDark ? Colors.grey : null),
+                      ),
+                      onSubmitted: (_) => _addTodo(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton(
+                    onPressed: _todos.length < 5 ? _addTodo : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: textColor,
+                      foregroundColor: boxColor,
+                      padding: const EdgeInsets.all(15),
+                    ),
+                    child: const Icon(Icons.add),
+                  )
+                ],
+              ),
+              const SizedBox(height: 10),
+              
+              // LİSTE TAŞMASINI ÖNLEYEN YAPI:
+              ListView.builder(
+                shrinkWrap: true, // Listeyi içeriği kadar daralt
+                physics: const NeverScrollableScrollPhysics(), // İç içe scroll çatışmasını engelle
                 itemCount: _todos.length,
                 itemBuilder: (context, index) {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Checkbox(
                       value: _todoStates[index],
-                      activeColor: Colors.black,
+                      activeColor: textColor,
+                      checkColor: boxColor,
                       onChanged: (bool? value) {
-                        setState(() {
-                          _todoStates[index] = value!;
-                        });
+                        HapticFeedback.selectionClick();
+                        setState(() { _todoStates[index] = value!; });
                         _saveTodos();
                       },
                     ),
                     title: Text(
                       _todos[index],
                       style: TextStyle(
-                        decoration: _todoStates[index]
-                            ? TextDecoration.lineThrough
-                            : null,
+                        decoration: _todoStates[index] ? TextDecoration.lineThrough : null,
+                        color: _todoStates[index] ? Colors.grey : textColor,
                       ),
                     ),
                     trailing: IconButton(
@@ -152,56 +245,61 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-            ),
 
-            // --- HABITS (ALIŞKANLIKLAR) BÖLÜMÜ ---
-            const Divider(thickness: 2),
-            const SizedBox(height: 10),
-            const Text(
-              'HABITS',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            
-            // 4'lü Alışkanlık Grid'i
-// 4'lü Alışkanlık Grid'i
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _habits.keys.map((String key) {
-                bool isDone = _habits[key]!;
-                
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _habits[key] = !isDone;
-                    });
-                    _saveHabit(key, !isDone);
-                  },
-                  child: Container(
-                    width: (MediaQuery.of(context).size.width - 50) / 2,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    decoration: BoxDecoration(
-                      color: isDone ? Colors.black : Colors.white,
-                      border: Border.all(color: Colors.black),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(
-                        key,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isDone ? Colors.white : Colors.black,
-                        ),
+              const Divider(thickness: 2),
+              const SizedBox(height: 10),
+              const Text('HABITS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 15),
+              
+              Wrap(
+                spacing: 15,
+                runSpacing: 15,
+                children: _habits.map((String h) {
+                  bool isDone = _dailyStatus[h]!;
+                  int currentLevel = _totalXP[h]!;
+                  
+                  return InkWell(
+                    onTap: () => _toggleHabit(h),
+                    borderRadius: BorderRadius.circular(12),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: (MediaQuery.of(context).size.width - 55) / 2,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      decoration: BoxDecoration(
+                        color: isDone ? textColor : boxColor,
+                        border: Border.all(color: textColor, width: 2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            h, // Gym, Reading vs.
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                              color: isDone ? boxColor : textColor,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Lv. $currentLevel",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDone ? boxColor.withOpacity(0.7) : Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ); // <--- InkWell burada düzgünce kapanıyor
-                
-              }).toList(), // <--- map fonksiyonu kapanıp listeye çevriliyor
-            ),
-            const SizedBox(height: 20),
-          ],
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

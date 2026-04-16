@@ -95,9 +95,12 @@ class _PrayerScreenState extends State<PrayerScreen> {
     });
     await prefs.setInt('qaza_$key', newValue);
   }
-
+  
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    Color iconColor = isDark ? Colors.white : Colors.black;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -105,7 +108,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Camii Logosu ve Hadis
-            const Icon(Icons.mosque, size: 48, color: Colors.black),
+            Icon(Icons.mosque, size: 48, color: iconColor),
             const SizedBox(height: 10),
             const Text(
               '"Allah ibadetin az da olsa devamlı olanını sever."',
