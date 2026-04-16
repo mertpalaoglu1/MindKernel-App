@@ -40,12 +40,20 @@ class _MedScreenState extends State<MedScreen> {
   }
 
   // Zamanlayıcıyı başlatma
-  void _startTimer(int minutes) {
+  void _startTimer(int minutes) async { 
     _timer?.cancel();
     setState(() {
       _secondsRemaining = minutes * 60;
       _isActive = true;
     });
+
+    // BAŞLANGIÇ SESİ (Bunu ekledik)
+    try {
+      // audioplayers paketi AssetSource kullandığında otomatik olarak 'assets/' klasörünün içine bakar.
+      await _audioPlayer.play(AssetSource('sounds/bell_sound.mp3'));
+    } catch (e) {
+      debugPrint("Başlangıç sesi çalınamadı: $e");
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsRemaining > 0) {
