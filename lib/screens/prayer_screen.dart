@@ -9,22 +9,21 @@ class PrayerScreen extends StatefulWidget {
 }
 
 class _PrayerScreenState extends State<PrayerScreen> {
-  // Günlük namazlar (İngilizce terimler, minimalist dilde evrensel tutmak için)
+  // Türkçeleri eklendi
   final Map<String, bool> _dailyPrayers = {
-    'Fajr': false,
-    'Dhuhr': false,
-    'Asr': false,
-    'Maghrib': false,
-    'Isha': false,
+    'Fajr (Sabah)': false,
+    'Dhuhr (Öğle)': false,
+    'Asr (İkindi)': false,
+    'Maghrib (Akşam)': false,
+    'Isha (Yatsı)': false,
   };
 
-  // Kaza namazları sayaçları
   final Map<String, int> _qazaPrayers = {
-    'Fajr': 0,
-    'Dhuhr': 0,
-    'Asr': 0,
-    'Maghrib': 0,
-    'Isha': 0,
+    'Fajr (Sabah)': 0,
+    'Dhuhr (Öğle)': 0,
+    'Asr (İkindi)': 0,
+    'Maghrib (Akşam)': 0,
+    'Isha (Yatsı)': 0,
   };
 
   int _totalPerfectDays = 0;
@@ -38,13 +37,15 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Future<void> _loadPrayerData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String today = DateTime.now().toIso8601String().substring(0, 10); // Sadece YYYY-MM-DD
+    
+    // TRICK: Günü sabah 4'te bitirir. Gece 2'de yatsı kılarsan dünün yatsısı sayılır.
+    DateTime logicalNow = DateTime.now().subtract(const Duration(hours: 4));
+    final String today = logicalNow.toIso8601String().substring(0, 10);
     
     setState(() {
       _lastSavedDate = prefs.getString('lastPrayerDate') ?? today;
       _totalPerfectDays = prefs.getInt('perfectPrayerDays') ?? 0;
 
-      // Eğer gün değiştiyse günlük kutuları sıfırla, değişmediyse eski veriyi çek
       bool isNewDay = _lastSavedDate != today;
 
       for (var key in _dailyPrayers.keys) {
@@ -53,51 +54,41 @@ class _PrayerScreenState extends State<PrayerScreen> {
         } else {
           _dailyPrayers[key] = prefs.getBool('prayer_$key') ?? false;
         }
-        // Kaza verilerini çek (gün değişiminden etkilenmez)
         _qazaPrayers[key] = prefs.getInt('qaza_$key') ?? 0;
       }
 
       if (isNewDay) {
         prefs.setString('lastPrayerDate', today);
+        prefs.setBool('wasPerfectToday', false);
       }
     });
   }
 
-  // Günlük namaz kaydetme ve "Kusursuz Gün" hesabı
   Future<void> _toggleDailyPrayer(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    
     setState(() {
       _dailyPrayers[key] = value;
     });
     await prefs.setBool('prayer_$key', value);
 
-    // Eğer 5 vakit de kılındıysa total günü artır (Sadece hepsi true olduğunda 1 kez tetiklenir)
     bool allCompleted = _dailyPrayers.values.every((v) => v == true);
     bool wasCompleted = prefs.getBool('wasPerfectToday') ?? false;
 
     if (allCompleted && !wasCompleted) {
-      setState(() {
-        _totalPerfectDays++;
-      });
+      setState(() => _totalPerfectDays++);
       await prefs.setInt('perfectPrayerDays', _totalPerfectDays);
       await prefs.setBool('wasPerfectToday', true);
     } else if (!allCompleted && wasCompleted) {
-      // Çentiği geri alırsa mükemmel günü düşür
-      setState(() {
-        _totalPerfectDays--;
-      });
+      setState(() => _totalPerfectDays--);
       await prefs.setInt('perfectPrayerDays', _totalPerfectDays);
       await prefs.setBool('wasPerfectToday', false);
     }
   }
 
-  // Kaza artırma/azaltma
   Future<void> _updateQaza(String key, int change) async {
     final prefs = await SharedPreferences.getInstance();
     int newValue = (_qazaPrayers[key] ?? 0) + change;
-    
-    if (newValue < 0) return; // Kaza eksiye düşemez
+    if (newValue < 0) return;
 
     setState(() {
       _qazaPrayers[key] = newValue;
@@ -111,50 +102,33 @@ class _PrayerScreenState extends State<PrayerScreen> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Üst Bilgi: Toplam Kusursuz Gün
-            Center(
-              child: Column(
-                children: [
-                  const Text(
-                    'PERFECT DAYS',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2.0,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  Text(
-                    '$_totalPerfectDays',
-                    style: const TextStyle(
-                      fontSize: 60,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            // Camii Logosu ve Hadis
+            const Icon(Icons.mosque, size: 48, color: Colors.black),
+            const SizedBox(height: 10),
+            const Text(
+              '"Allah ibadetin az da olsa devamlı olanını sever."',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 30),
 
-            // Günlük Namazlar
-            const Text(
-              'DAILY PRAYERS',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Column(
+              children: [
+                const Text('PERFECT DAYS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 2.0, color: Colors.grey)),
+                Text('$_totalPerfectDays', style: const TextStyle(fontSize: 50, fontWeight: FontWeight.bold)),
+              ],
             ),
+            const SizedBox(height: 20),
+
+            const Align(alignment: Alignment.centerLeft, child: Text('DAILY PRAYERS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
             const Divider(thickness: 2, color: Colors.black),
             ..._dailyPrayers.keys.map((String key) {
               return CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 activeColor: Colors.black,
-                title: Text(
-                  key,
-                  style: TextStyle(
-                    fontSize: 18,
-                    decoration: _dailyPrayers[key]! ? TextDecoration.lineThrough : null,
-                  ),
-                ),
+                title: Text(key, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, decoration: _dailyPrayers[key]! ? TextDecoration.lineThrough : null)),
                 value: _dailyPrayers[key],
                 onChanged: (bool? value) {
                   if (value != null) _toggleDailyPrayer(key, value);
@@ -163,12 +137,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
             }),
 
             const SizedBox(height: 30),
-
-            // Kaza Takibi
-            const Text(
-              'QAZA (MISSED) TRACKER',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Align(alignment: Alignment.centerLeft, child: Text('QAZA (MISSED)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
             const Divider(thickness: 2, color: Colors.black),
             ..._qazaPrayers.keys.map((String key) {
               return Padding(
@@ -176,28 +145,12 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(key, style: const TextStyle(fontSize: 16)),
+                    Text(key, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                     Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () => _updateQaza(key, -1),
-                        ),
-                        SizedBox(
-                          width: 40,
-                          child: Text(
-                            '${_qazaPrayers[key]}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline),
-                          onPressed: () => _updateQaza(key, 1),
-                        ),
+                        IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => _updateQaza(key, -1)),
+                        SizedBox(width: 30, child: Text('${_qazaPrayers[key]}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                        IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => _updateQaza(key, 1)),
                       ],
                     ),
                   ],
