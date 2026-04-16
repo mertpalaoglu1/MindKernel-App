@@ -5,15 +5,11 @@ import 'screens/main_layout.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase (Placeholder configuration)
-  // Note: You will need to run 'flutterfire configure' to generate actual firebase_options.dart
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase init failed or not configured. Running offline.");
+    debugPrint("Firebase init failed. Running offline.");
   }
-
   runApp(const DisciplineApp());
 }
 
@@ -22,11 +18,19 @@ class DisciplineApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Discipline',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.minimalistTheme,
-      home: const MainLayout(),
+    // Tema değiştiğinde tüm ekranı anında yenileyen dinleyici
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp(
+          title: 'Discipline',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode, // Aktif tema
+          home: const MainLayout(),
+        );
+      },
     );
   }
 }
