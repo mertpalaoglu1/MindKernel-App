@@ -22,18 +22,9 @@ MindKernel is designed to help you build discipline, track your habits (and pray
   - Track daily prayers
   - Build consistency in worship
 
-## 🎯 Philosophy
-
-This app is built on a simple idea:
-
-> Discipline over motivation.
-
-No distractions.  
-No dopamine traps.  
-Just consistency.
-
 ## 🛠️ Tech Stack
 
 - Flutter (UI)
 - Firebase (optional backend) (working progress)
 - Local storage for fast performance
+- Gemini 3.1 Pro, vibecoding, and some imagination.
