@@ -180,7 +180,7 @@ class _StreakScreenState extends State<StreakScreen> with WidgetsBindingObserver
                   _timeBox(seconds.toString().padLeft(2, '0'), 'SEC', textColor),
                 ],
               ),
-              const SizedBox(height: 60),
+              const SizedBox(height: 30),
 
               OutlinedButton(
                 onPressed: _resetStreak,
@@ -193,7 +193,14 @@ class _StreakScreenState extends State<StreakScreen> with WidgetsBindingObserver
               const SizedBox(height: 10),
               Text('Attempt #$_attemptCount', style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 40), // Spacer yerine SizedBox kullanıldı
-
+              // Alıntı (Quote) Bölümü
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(12)), 
+                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: textColor)), 
+              ),
+              const SizedBox(height: 20),
               // --- ACHIEVEMENTS (BAŞARILAR) BÖLÜMÜ ---
               const Align(
                 alignment: Alignment.centerLeft,
@@ -260,16 +267,6 @@ class _StreakScreenState extends State<StreakScreen> with WidgetsBindingObserver
                   );
                 },
               ),
-              const SizedBox(height: 20),
-
-              // Alıntı (Quote) Bölümü
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(12)), 
-                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: textColor)), 
-              ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
