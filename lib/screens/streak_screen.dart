@@ -15,12 +15,33 @@ class _StreakScreenState extends State<StreakScreen> {
   Timer? _timer;
   Duration _currentStreak = Duration.zero;
   String _currentQuote = "";
+  int _AttemptCount=1;
 
   final List<String> _quotes = [
     "Suffer the pain of discipline or suffer the pain of regret.",
     "Your future is created by what you do today, not tomorrow.",
     "Don't trade what you want most for what you want right now.",
     "Discipline equals freedom.",
+    "You don't need motivation, you need control.",
+    "Every urge you resist makes you stronger.",
+    "Short-term pleasure, long-term damage.",
+    "Control your mind or it will control you.",
+    "Addiction is giving up everything for one thing.",
+    "Discipline is choosing what you want most over what you want now.",
+    "The urge will pass. The consequences might not.",
+    "Weak moments create strong regrets.",
+    "You either master your habits or they master you.",
+    "Comfort is the enemy of growth.",
+    "You are not your urges.",
+    "What you repeat, you become.",
+    "Easy choices, hard life. Hard choices, easy life.",
+    "One decision can change your entire trajectory.",
+    "Stop escaping. Start building.",
+    "Dopamine now or success later. Choose.",
+    "The mind seeks comfort, the strong seek growth.",
+    "Every 'just once' builds the chain.",
+    "Break the loop or stay in it forever.",
+    "Self-control is self-respect.",
   ];
 
   @override
@@ -61,6 +82,7 @@ class _StreakScreenState extends State<StreakScreen> {
         _lastResetDate = DateTime.now();
         prefs.setString('lastResetDate', _lastResetDate!.toIso8601String());
       }
+      _AttemptCount = prefs.getInt('AttemptCount') ?? 1;
       _currentStreak = DateTime.now().difference(_lastResetDate!);
     });
   }
@@ -93,7 +115,9 @@ class _StreakScreenState extends State<StreakScreen> {
       setState(() {
         _lastResetDate = now;
         _currentStreak = Duration.zero;
+        _AttemptCount ++; //denemeyi arttır.
       });
+      await prefs.setInt('AttemptCount', _AttemptCount); //kaydet.
       _pickRandomQuote();
     }
   }
