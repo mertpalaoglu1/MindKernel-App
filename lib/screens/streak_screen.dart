@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Titreşim için eklendi
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 
@@ -10,12 +11,23 @@ class StreakScreen extends StatefulWidget {
   State<StreakScreen> createState() => _StreakScreenState();
 }
 
-class _StreakScreenState extends State<StreakScreen> {
+// WidgetsBindingObserver arka plandan uyanmayı dinlemek için eklendi
+class _StreakScreenState extends State<StreakScreen> with WidgetsBindingObserver {
   DateTime? _lastResetDate;
   Timer? _timer;
   Duration _currentStreak = Duration.zero;
   String _currentQuote = "";
-  int _attemptCount=1;
+  int _attemptCount = 1;
+
+  // Başarı Kilometre Taşları (Achievements)
+  final List<Map<String, dynamic>> _milestones = [
+    {'days': 1, 'title': 'Seed', 'desc': 'First 24 hours conquered.'},
+    {'days': 3, 'title': 'Sprout', 'desc': 'Focus starts to clear.'},
+    {'days': 7, 'title': 'Disciplined', 'desc': 'One full week of control.'},
+    {'days': 14, 'title': 'Warrior', 'desc': 'Breaking the physical urge.'},
+    {'days': 30, 'title': 'Monk Mode', 'desc': 'Mind is being rewired.'},
+    {'days': 90, 'title': 'The Reboot', 'desc': 'Kernel optimization complete.'},
+  ];
 
   final List<String> _quotes = [
     "Suffer the pain of discipline or suffer the pain of regret.",
@@ -47,6 +59,7 @@ class _StreakScreenState extends State<StreakScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Dinleyiciyi başlat
     _loadStreakData();
     _pickRandomQuote();
     // Saniyede bir ekranı güncelleyen canlı sayaç
@@ -62,7 +75,16 @@ class _StreakScreenState extends State<StreakScreen> {
   @override
   void dispose() {
     _timer?.cancel(); // Hafıza sızıntısını önlemek için
+    WidgetsBinding.instance.removeObserver(this); // Dinleyiciyi kapat
     super.dispose();
+  }
+
+  // Uygulama arka plandan öne geldiğinde süreyi anında günceller
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadStreakData();
+    }
   }
 
   void _pickRandomQuote() {
@@ -88,10 +110,11 @@ class _StreakScreenState extends State<StreakScreen> {
   }
 
   Future<void> _resetStreak() async {
+    HapticFeedback.vibrate(); // Uyarı titreşimi
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Tema uyumlu renk
         title: const Text("Reset Streak?", style: TextStyle(fontWeight: FontWeight.bold)),
         content: const Text("Are you sure you want to start over? Stay strong."),
         actions: [
@@ -109,20 +132,20 @@ class _StreakScreenState extends State<StreakScreen> {
     );
 
     if (confirm == true) {
+      HapticFeedback.heavyImpact(); // Onaylandığında güçlü titreşim
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       await prefs.setString('lastResetDate', now.toIso8601String());
       setState(() {
         _lastResetDate = now;
         _currentStreak = Duration.zero;
-        _attemptCount ++; //denemeyi arttır.
+        _attemptCount++; // denemeyi arttır.
       });
-      await prefs.setInt('AttemptCount', _attemptCount); //kaydet.
+      await prefs.setInt('AttemptCount', _attemptCount); // kaydet.
       _pickRandomQuote();
     }
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     int days = _currentStreak.inDays;
@@ -136,7 +159,7 @@ class _StreakScreenState extends State<StreakScreen> {
     Color boxColor = isDark ? Colors.grey[900]! : Colors.grey[100]!;
 
     return SafeArea(
-      child: Center(
+      child: SingleChildScrollView( // Taşmayı önlemek için SingleChildScrollView
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -148,13 +171,13 @@ class _StreakScreenState extends State<StreakScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _timeBox(days.toString().padLeft(2, '0'), 'DAYS'),
-                  const Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                  _timeBox(hours.toString().padLeft(2, '0'), 'HRS'),
-                  const Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                  _timeBox(minutes.toString().padLeft(2, '0'), 'MIN'),
-                  const Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                  _timeBox(seconds.toString().padLeft(2, '0'), 'SEC'),
+                  _timeBox(days.toString().padLeft(2, '0'), 'DAYS', textColor),
+                  Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: textColor)),
+                  _timeBox(hours.toString().padLeft(2, '0'), 'HRS', textColor),
+                  Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: textColor)),
+                  _timeBox(minutes.toString().padLeft(2, '0'), 'MIN', textColor),
+                  Text(':', style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: textColor)),
+                  _timeBox(seconds.toString().padLeft(2, '0'), 'SEC', textColor),
                 ],
               ),
               const SizedBox(height: 60),
@@ -165,14 +188,86 @@ class _StreakScreenState extends State<StreakScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                   side: BorderSide(color: textColor, width: 2), // Renk dinamikleşti
                 ),
-                child: Text('RESET STREAK', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)), // Renk dinamikleşti
+                child: Text('RESET STREAK', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)), 
               ),
+              const SizedBox(height: 10),
               Text('Attempt #$_attemptCount', style: const TextStyle(color: Colors.grey)),
-              const Spacer(),
+              const SizedBox(height: 40), // Spacer yerine SizedBox kullanıldı
+
+              // --- ACHIEVEMENTS (BAŞARILAR) BÖLÜMÜ ---
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('ACHIEVEMENTS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+              ),
+              const Divider(thickness: 2),
+              const SizedBox(height: 10),
+
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _milestones.length,
+                itemBuilder: (context, index) {
+                  var m = _milestones[index];
+                  bool isUnlocked = days >= m['days']; // Gerekli gün sağlandı mı?
+                  
+                  return Opacity(
+                    opacity: isUnlocked ? 1.0 : 0.4, // Kilitliyse soluk görünür
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isUnlocked ? textColor : Colors.transparent,
+                        border: Border.all(color: textColor),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isUnlocked ? Icons.verified : Icons.lock_outline,
+                            color: isUnlocked ? (isDark ? Colors.black : Colors.white) : textColor,
+                          ),
+                          const SizedBox(width: 15),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                m['title'],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isUnlocked ? (isDark ? Colors.black : Colors.white) : textColor,
+                                ),
+                              ),
+                              Text(
+                                m['desc'],
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isUnlocked ? (isDark ? Colors.black54 : Colors.white70) : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            "${m['days']}d",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isUnlocked ? (isDark ? Colors.black : Colors.white) : textColor,
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // Alıntı (Quote) Bölümü
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(12)), // Renk dinamikleşti
-                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: textColor)), // Renk dinamikleşti
+                decoration: BoxDecoration(color: boxColor, borderRadius: BorderRadius.circular(12)), 
+                child: Text('"$_currentQuote"', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: textColor)), 
               ),
               const SizedBox(height: 20),
             ],
@@ -182,11 +277,11 @@ class _StreakScreenState extends State<StreakScreen> {
     );
   }
   
-  // Zaman kutucukları için yardımcı widget
-  Widget _timeBox(String value, String label) {
+  // Zaman kutucukları Dark Mode için Color parametresi aldı
+  Widget _timeBox(String value, String label, Color color) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: color)),
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
       ],
     );
