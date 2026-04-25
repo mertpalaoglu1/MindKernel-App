@@ -10,21 +10,19 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<String> _todos = [];
   List<bool> _todoStates = [];
   final TextEditingController _todoController = TextEditingController();
 
-  // Eylem isimleri butonlarda kalacak
   final List<String> _habits = ['Gym', 'Meditation', 'Reading', 'Journal'];
-  
   Map<String, bool> _dailyStatus = {};
   Map<String, int> _totalXP = {};
-  String _lastSavedDate = "";
-
+  
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     for (var h in _habits) {
       _dailyStatus[h] = false;
       _totalXP[h] = 0;
@@ -32,22 +30,36 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadData();
+    }
+  }
+
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     DateTime logicalNow = DateTime.now().subtract(const Duration(hours: 4));
     final String today = logicalNow.toIso8601String().substring(0, 10);
+    final String lastSavedDate = prefs.getString('lastHabitDate') ?? today;
 
     setState(() {
       _todos = prefs.getStringList('todos') ?? [];
       _todoStates = (prefs.getStringList('todoStates') ?? []).map((e) => e == 'true').toList();
-      _lastSavedDate = prefs.getString('lastHabitDate') ?? today;
       
-      bool isNewDay = _lastSavedDate != today;
+      bool isNewDay = lastSavedDate != today;
 
       for (var h in _habits) {
         _totalXP[h] = prefs.getInt('xp_$h') ?? 0;
         if (isNewDay) {
           _dailyStatus[h] = false;
+          prefs.setBool('daily_$h', false);
         } else {
           _dailyStatus[h] = prefs.getBool('daily_$h') ?? false;
         }
@@ -103,30 +115,30 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveTodos();
   }
 
-  // XP'ye göre Unvan Belirleme
-  String get _currentTitle {
-    String bestHabit = _habits[0];
-    int maxXP = 0;
-    
-    for (var h in _habits) {
-      if (_totalXP[h]! > maxXP) {
-        maxXP = _totalXP[h]!;
-        bestHabit = h;
-      }
-    }
-    
-    if (maxXP == 0) return "The Initiate";
-    
-    switch (bestHabit) {
-      case 'Gym': return "The Juggernaut";
-      case 'Meditation': return "The Zen Master";
-      case 'Reading': return "The Sage";
-      case 'Journal': return "The Observer";
-      default: return "The Initiate";
-    }
+  // TOTAL LEVEL HESAPLAMA VE UNVAN (TITLE) BELİRLEME
+  int get _totalLevel {
+    return _totalXP.values.fold(0, (sum, xp) => sum + xp);
   }
 
-  // Kazanma Durumu (Sadece 4 alışkanlık true ise)
+  String get _currentTitle {
+    int lvl = _totalLevel;
+    if (lvl < 5) return "The Spark";
+    if (lvl < 10) return "The Initiate";
+    if (lvl < 15) return "The Learner";
+    if (lvl < 20) return "The Disciple";
+    if (lvl < 25) return "The Practitioner";
+    if (lvl < 30) return "The Builder";
+    if (lvl < 40) return "The Dedicated";
+    if (lvl < 50) return "The Consistent";
+    if (lvl < 60) return "The Driven";
+    if (lvl < 75) return "The Relentless";
+    if (lvl < 100) return "The Unstoppable";
+    if (lvl < 150) return "The Iron Will";
+    if (lvl < 200) return "The Elite";
+    if (lvl < 300) return "The Apex";
+  return "The Ascended";
+  }
+
   bool get _isDayWon {
     return _dailyStatus.values.every((state) => state == true);
   }
@@ -139,7 +151,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentTitle, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_currentTitle, style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 18)),
+            Text("TOTAL LEVEL: $_totalLevel", style: const TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 1)),
+          ],
+        ),
         actions: [
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
@@ -150,7 +168,6 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
-      // TAŞMA HATASINI ÇÖZEN SCROLL YAPISI:
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
@@ -162,29 +179,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white : Colors.black,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: isDark ? Colors.white : Colors.black, borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     children: [
-                      Text(
-                        "YOU WON TODAY.",
-                        style: TextStyle(color: isDark ? Colors.black : Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 3),
-                      ),
+                      Text("YOU WON TODAY.", style: TextStyle(color: isDark ? Colors.black : Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 3)),
                       const SizedBox(height: 5),
-                      Text(
-                        "Now put the phone down.",
-                        style: TextStyle(color: isDark ? Colors.grey[800] : Colors.grey[300], fontSize: 14),
-                      ),
+                      Text("Now put the phone down.", style: TextStyle(color: isDark ? Colors.grey[800] : Colors.grey[300], fontSize: 14)),
                     ],
                   ),
                 ),
               ],
-
               const Text('DAILY FOCUS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 10),
-              
               Row(
                 children: [
                   Expanded(
@@ -202,21 +208,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 10),
                   ElevatedButton(
                     onPressed: _todos.length < 5 ? _addTodo : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: textColor,
-                      foregroundColor: boxColor,
-                      padding: const EdgeInsets.all(15),
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: textColor, foregroundColor: boxColor, padding: const EdgeInsets.all(15)),
                     child: const Icon(Icons.add),
                   )
                 ],
               ),
               const SizedBox(height: 10),
-              
-              // LİSTE TAŞMASINI ÖNLEYEN YAPI:
               ListView.builder(
-                shrinkWrap: true, // Listeyi içeriği kadar daralt
-                physics: const NeverScrollableScrollPhysics(), // İç içe scroll çatışmasını engelle
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: _todos.length,
                 itemBuilder: (context, index) {
                   return ListTile(
@@ -231,33 +231,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         _saveTodos();
                       },
                     ),
-                    title: Text(
-                      _todos[index],
-                      style: TextStyle(
-                        decoration: _todoStates[index] ? TextDecoration.lineThrough : null,
-                        color: _todoStates[index] ? Colors.grey : textColor,
-                      ),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      onPressed: () => _deleteTodo(index),
-                    ),
+                    title: Text(_todos[index], style: TextStyle(decoration: _todoStates[index] ? TextDecoration.lineThrough : null, color: _todoStates[index] ? Colors.grey : textColor)),
+                    trailing: IconButton(icon: const Icon(Icons.close, color: Colors.grey), onPressed: () => _deleteTodo(index)),
                   );
                 },
               ),
-
               const Divider(thickness: 2),
               const SizedBox(height: 10),
               const Text('HABITS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 15),
-              
               Wrap(
                 spacing: 15,
                 runSpacing: 15,
                 children: _habits.map((String h) {
                   bool isDone = _dailyStatus[h]!;
                   int currentLevel = _totalXP[h]!;
-                  
                   return InkWell(
                     onTap: () => _toggleHabit(h),
                     borderRadius: BorderRadius.circular(12),
@@ -273,24 +261,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            h, // Gym, Reading vs.
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: isDone ? boxColor : textColor,
-                            ),
-                          ),
+                          Text(h, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: isDone ? boxColor : textColor)),
                           const SizedBox(height: 5),
-                          Text(
-                            "Lv. $currentLevel",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isDone ? boxColor.withOpacity(0.7) : Colors.grey,
-                            ),
-                          ),
+                          Text("Lv. $currentLevel", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDone ? boxColor.withOpacity(0.7) : Colors.grey)),
                         ],
                       ),
                     ),
