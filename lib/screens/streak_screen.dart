@@ -15,7 +15,7 @@ class _StreakScreenState extends State<StreakScreen> {
   Timer? _timer;
   Duration _currentStreak = Duration.zero;
   String _currentQuote = "";
-  int _AttemptCount=1;
+  int _attemptCount=1;
 
   final List<String> _quotes = [
     "Suffer the pain of discipline or suffer the pain of regret.",
@@ -82,7 +82,7 @@ class _StreakScreenState extends State<StreakScreen> {
         _lastResetDate = DateTime.now();
         prefs.setString('lastResetDate', _lastResetDate!.toIso8601String());
       }
-      _AttemptCount = prefs.getInt('AttemptCount') ?? 1;
+      _attemptCount = prefs.getInt('AttemptCount') ?? 1;
       _currentStreak = DateTime.now().difference(_lastResetDate!);
     });
   }
@@ -115,9 +115,9 @@ class _StreakScreenState extends State<StreakScreen> {
       setState(() {
         _lastResetDate = now;
         _currentStreak = Duration.zero;
-        _AttemptCount ++; //denemeyi arttır.
+        _attemptCount ++; //denemeyi arttır.
       });
-      await prefs.setInt('AttemptCount', _AttemptCount); //kaydet.
+      await prefs.setInt('AttemptCount', _attemptCount); //kaydet.
       _pickRandomQuote();
     }
   }
@@ -167,6 +167,7 @@ class _StreakScreenState extends State<StreakScreen> {
                 ),
                 child: Text('RESET STREAK', style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)), // Renk dinamikleşti
               ),
+              Text('Attempt #$_attemptCount', style: const TextStyle(color: Colors.grey)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.all(20),
