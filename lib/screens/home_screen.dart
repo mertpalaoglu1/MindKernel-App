@@ -43,22 +43,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadData() async {
+Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
     DateTime logicalNow = DateTime.now().subtract(const Duration(hours: 4));
     final String today = logicalNow.toIso8601String().substring(0, 10);
-    final String lastSavedDate = prefs.getString('lastHabitDate') ?? today;
+    
+    String? savedDate = prefs.getString('lastHabitDate');
+    if (savedDate == null) {
+      await prefs.setString('lastHabitDate', today);
+      savedDate = today;
+    }
 
     setState(() {
       _todos = prefs.getStringList('todos') ?? [];
       _todoStates = (prefs.getStringList('todoStates') ?? []).map((e) => e == 'true').toList();
       
-      bool isNewDay = lastSavedDate != today;
+      bool isNewDay = savedDate != today;
 
       for (var h in _habits) {
-        _totalXP[h] = prefs.getInt('xp_$h') ?? 0;
+        _totalXP[h] = prefs.getInt('xp_$h') ?? 0; // Toplam XP'yi çek
+        
         if (isNewDay) {
-          _dailyStatus[h] = false;
+          _dailyStatus[h] = false; // Yeni günse siyahlıkları kaldır
           prefs.setBool('daily_$h', false);
         } else {
           _dailyStatus[h] = prefs.getBool('daily_$h') ?? false;
@@ -66,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
 
       if (isNewDay) {
-        prefs.setString('lastHabitDate', today);
+        prefs.setString('lastHabitDate', today); // Yeni güne geçildiğini kaydet
       }
     });
   }

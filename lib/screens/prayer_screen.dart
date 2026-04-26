@@ -43,11 +43,17 @@ class _PrayerScreenState extends State<PrayerScreen> with WidgetsBindingObserver
     }
   }
 
-  Future<void> _loadPrayerData() async {
+ Future<void> _loadPrayerData() async {
     final prefs = await SharedPreferences.getInstance();
     DateTime logicalNow = DateTime.now().subtract(const Duration(hours: 4));
     final String today = logicalNow.toIso8601String().substring(0, 10);
-    final String lastSavedDate = prefs.getString('lastPrayerDate') ?? today;
+    
+    // İLK GÜN KAYDI ZORUNLULUĞU
+    String? lastSavedDate = prefs.getString('lastPrayerDate');
+    if (lastSavedDate == null) {
+      await prefs.setString('lastPrayerDate', today);
+      lastSavedDate = today;
+    }
 
     setState(() {
       _totalPerfectDays = prefs.getInt('perfectPrayerDays') ?? 0;
@@ -59,7 +65,7 @@ class _PrayerScreenState extends State<PrayerScreen> with WidgetsBindingObserver
 
       if (lastSavedDate != today) {
         // GÜN DEĞİŞMİŞ! Kaza hesaplaması yap
-        DateTime lastDate = DateTime.parse(lastSavedDate);
+        DateTime lastDate = DateTime.parse(lastSavedDate!);
         DateTime currentDate = DateTime.parse(today);
         int missedDays = currentDate.difference(lastDate).inDays;
 
