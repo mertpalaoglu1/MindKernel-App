@@ -14,7 +14,7 @@ MindKernel is designed to help you build discipline, track your habits (and pray
   - Focus sessions
   - Build mental clarity and control
 
-- 🔥 **NoFap / Addiction Tracker**
+- 🔥 **Addiction Tracker**
   - Streak tracking
   - Urge awareness & self-control
 
