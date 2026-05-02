@@ -1,98 +1,101 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-class MedScreen extends StatefulWidget {
-  const MedScreen({super.key});
+class MeditationScreen extends StatefulWidget {
+  const MeditationScreen({super.key});
 
   @override
-  State<MedScreen> createState() => _MedScreenState();
+  State<MeditationScreen> createState() => _MeditationScreenState();
 }
 
-class _MedScreenState extends State<MedScreen> {
+// Arka plandan dönmeyi dinlemek için WidgetsBindingObserver ekledik
+class _MeditationScreenState extends State<MeditationScreen> with WidgetsBindingObserver {
   Timer? _timer;
   int _secondsRemaining = 0;
   bool _isActive = false;
+  DateTime? _endTime; // SÜREKLİ ZAMAN KONTROLÜ İÇİN BİTİŞ ZAMANI
   
   final AudioPlayer _audioPlayer = AudioPlayer();
-  int _meditationStreak = 0;
+
+  // 3 Dakikalık seçenek eklendi
+  final List<int> _durations = [3, 5, 10, 15, 20]; 
 
   @override
   void initState() {
     super.initState();
-    _loadStreak();
+    WidgetsBinding.instance.addObserver(this); // Dinleyiciyi başlat
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _audioPlayer.dispose();
+    WidgetsBinding.instance.removeObserver(this); // Dinleyiciyi kapat
     super.dispose();
   }
 
-  // Hafızadan seri bilgisini çekme
-  Future<void> _loadStreak() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _meditationStreak = prefs.getInt('meditationStreak') ?? 0;
-    });
+  // EKRAN KİLİDİ AÇILDIĞINDA VEYA UYGULAMAYA DÖNÜLDÜĞÜNDE TETİKLENİR
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isActive && _endTime != null) {
+      _updateTimer(); // Uyandığı an süreyi gerçek zamana göre düzelt
+    }
   }
 
-  // Zamanlayıcıyı başlatma
-  void _startTimer(int minutes) async { 
+  void _startTimer(int minutes) async {
     _timer?.cancel();
     setState(() {
       _secondsRemaining = minutes * 60;
       _isActive = true;
+      // BİTİŞ ZAMANINI ŞU ANKİ ZAMAN + SEÇİLEN DAKİKA OLARAK BELİRLE
+      _endTime = DateTime.now().add(Duration(minutes: minutes));
     });
 
-    // BAŞLANGIÇ SESİ (Bunu ekledik)
+    // BAŞLANGIÇ SESİ
     try {
-      // audioplayers paketi AssetSource kullandığında otomatik olarak 'assets/' klasörünün içine bakar.
       await _audioPlayer.play(AssetSource('sounds/bell_sound.mp3'));
     } catch (e) {
       debugPrint("Başlangıç sesi çalınamadı: $e");
     }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsRemaining > 0) {
-        setState(() {
-          _secondsRemaining--;
-        });
-      } else {
-        _onFinished();
-      }
+      _updateTimer();
     });
   }
 
-  // Süre bittiğinde yapılacaklar
+  // ZAMANI GERÇEK SAATE GÖRE HESAPLAYAN FONKSİYON
+  void _updateTimer() {
+    if (_endTime == null) return;
+
+    final now = DateTime.now();
+    final difference = _endTime!.difference(now).inSeconds;
+
+    if (difference > 0) {
+      setState(() {
+        _secondsRemaining = difference;
+      });
+    } else {
+      // Süre bitti (Eğer telefon uykudayken bittiyse uyandığında burası direkt çalışır)
+      _onFinished();
+    }
+  }
+
   void _onFinished() async {
     _timer?.cancel();
     setState(() {
       _isActive = false;
       _secondsRemaining = 0;
-    });
-    
-    // Bitiş sesi (assets/sounds/bell.mp3 dosyasını eklemeyi unutma)
-    try {
-      await _audioPlayer.play(AssetSource('sounds/bell.mp3'));
-    } catch (e) {
-      debugPrint("Ses dosyası bulunamadı, sessiz devam ediliyor.");
-    }
-    
-    // Seri güncelleme
-    final prefs = await SharedPreferences.getInstance();
-    int newStreak = _meditationStreak + 1;
-    await prefs.setInt('meditationStreak', newStreak);
-    setState(() {
-      _meditationStreak = newStreak;
+      _endTime = null;
     });
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Session complete. Stay mindful.')),
-      );
+    // BİTİŞ SESİ VE TİTREŞİM
+    try {
+      await _audioPlayer.play(AssetSource('sounds/bell.mp3'));
+      HapticFeedback.heavyImpact(); 
+    } catch (e) {
+      debugPrint("Sonda ses hatası: $e");
     }
   }
 
@@ -101,87 +104,84 @@ class _MedScreenState extends State<MedScreen> {
     setState(() {
       _isActive = false;
       _secondsRemaining = 0;
+      _endTime = null;
     });
   }
 
-  String _formatTime(int seconds) {
-    int mins = seconds ~/ 60;
-    int secs = seconds % 60;
-    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  String get _formattedTime {
+    int minutes = _secondsRemaining ~/ 60;
+    int seconds = _secondsRemaining % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    Color textColor = isDark ? Colors.white : Colors.black;
+    Color boxColor = isDark ? Colors.grey[900]! : Colors.white;
+
     return SafeArea(
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'MEDITATION STREAK',
-              style: TextStyle(fontSize: 14, letterSpacing: 2, color: Colors.grey),
-            ),
+            const Icon(Icons.self_improvement, size: 64, color: Colors.grey),
+            const SizedBox(height: 20),
+            
+            // SAYAÇ EKRANI
             Text(
-              '$_meditationStreak DAYS',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 50),
-            
-            // Minimalist Daire Zamanlayıcı
-            Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.black, width: 1),
-              ),
-              child: Center(
-                child: Text(
-                  _formatTime(_secondsRemaining),
-                  style: const TextStyle(fontSize: 60, fontWeight: FontWeight.w200),
-                ),
+              _formattedTime,
+              style: TextStyle(
+                fontSize: 80,
+                fontWeight: FontWeight.bold,
+                color: textColor,
               ),
             ),
-            
-            const SizedBox(height: 50),
-            
+            const SizedBox(height: 40),
+
+            // BUTONLAR
             if (!_isActive) ...[
-              const Text('Select Duration:'),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _timeButton(5),
-                  const SizedBox(width: 15),
-                  _timeButton(10),
-                  const SizedBox(width: 15),
-                  _timeButton(15),
-                ],
+              Wrap(
+                spacing: 15,
+                runSpacing: 15,
+                alignment: WrapAlignment.center,
+                children: _durations.map((mins) {
+                  return OutlinedButton(
+                    onPressed: () => _startTimer(mins),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: textColor, width: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(
+                      '$mins MIN',
+                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  );
+                }).toList(),
               ),
-            ] else 
+            ] else ...[
               OutlinedButton(
                 onPressed: _stopTimer,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Colors.black),
+                  side: const BorderSide(color: Colors.redAccent, width: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                 ),
-                child: const Text('CANCEL SESSION'),
+                child: const Text(
+                  'CANCEL',
+                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
+            ],
+            
+            const SizedBox(height: 40),
+            Text(
+              _isActive ? "Focus on your breath." : "Select duration to begin.",
+              style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+            )
           ],
         ),
       ),
-    );
-  }
-
-  Widget _timeButton(int mins) {
-    return ElevatedButton(
-      onPressed: () => _startTimer(mins),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      ),
-      child: Text('$mins MIN'),
     );
   }
 }

@@ -19,7 +19,7 @@ final List<Widget> _screens = [
     const HomeScreen(), // Artık gerçek ekranımızı gösteriyor
     const StreakScreen(),
     const PrayerScreen(),
-    const MedScreen(),
+    const MeditationScreen(),
   ];
 
   @override
